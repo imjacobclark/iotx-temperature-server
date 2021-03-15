@@ -1,0 +1,37 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Globals:
+  Function:
+    Timeout: 3
+
+Resources:
+  TemperatureWriterFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: app.lambdaHandler
+      Runtime: nodejs12.x
+      Events:
+        Temperature:
+          Type: Api
+          Properties:
+            Path: /
+            Method: get
+      Policies:
+      - Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - cloudwatch:PutMetricData
+          Resource: '*'
+
+Outputs:
+  TemperatureApi:
+    Description: "API Gateway endpoint URL for Prod stage for Temperature Writer function"
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/hello/"
+  TemperatureWriterFunction:
+    Description: "Temperature Writer Lambda Function ARN"
+    Value: !GetAtt TemperatureWriterFunction.Arn
+  TemperatureWriterFunctionIamRole:
+    Description: "Implicit IAM Role created for Temperature Writer function"
+    Value: !GetAtt TemperatureWriterFunctionRole.Arn

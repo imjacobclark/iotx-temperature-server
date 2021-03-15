@@ -1,0 +1,9 @@
+version = 0.1
+[default]
+[default.deploy]
+[default.deploy.parameters]
+stack_name = "iotx-temperature-server"
+s3_bucket = "aws-sam-cli-managed-default-samclisourcebucket-176ko9gbxmwi"
+s3_prefix = "iotx-temperature-server"
+region = "eu-west-1"
+capabilities = "CAPABILITY_IAM"

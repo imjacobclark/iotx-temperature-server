@@ -11,11 +11,36 @@ Resources:
       CodeUri: src/
       Handler: app.lambdaHandler
       Runtime: nodejs12.x
+      Tracing: Active
       Events:
         Temperature:
           Type: Api
           Properties:
             Path: /
+            Method: get
+      Policies:
+      - CloudWatchLambdaInsightsExecutionRolePolicy
+      - Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - cloudwatch:PutMetricData
+          - timestream:WriteRecords
+          - timestream:DescribeEndpoints
+          Resource: '*'
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:580247275435:layer:LambdaInsightsExtension:12"
+  NodePingFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: nodePing.lambdaHandler
+      Runtime: nodejs12.x
+      Events:
+        NodePing:
+          Type: Api
+          Properties:
+            Path: /nodePing
             Method: get
       Policies:
       - Version: '2012-10-17'
@@ -24,11 +49,74 @@ Resources:
           Action:
           - cloudwatch:PutMetricData
           Resource: '*'
+  TemperatureHistoryFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: temperatureHistory.lambdaHandler
+      Runtime: nodejs12.x
+      Events:
+        NodePing:
+          Type: Api
+          Properties:
+            Path: /{room}
+            Method: get
+      Policies:
+      - Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - cloudwatch:GetMetricStatistics
+          Resource: '*'
+  TemperatureAnomaly:
+    Type: AWS::CloudWatch::AnomalyDetector
+    Properties: 
+      Dimensions: 
+        - Name: ROOM
+          Value: office
+      MetricName: TEMPERATURE
+      Namespace: IOTX-TEMPERATURE-METRICS
+      Stat: Average
+  TemperatureAnomalyAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: Temperature Anomaly Alarm
+      AlarmName: TemperatureAnomaly
+      ComparisonOperator: LessThanLowerOrGreaterThanUpperThreshold
+      EvaluationPeriods: 1
+      Metrics:
+      - Expression: ANOMALY_DETECTION_BAND(m1, 2)
+        Id: ad1
+      - Id: m1
+        MetricStat:
+          Metric:
+            MetricName: TEMPERATURE
+            Namespace: IOTX-TEMPERATURE-METRICS
+            Dimensions:
+              - Name: ROOM 
+                Value: "office"
+          Period: !!int 60
+          Stat: Average
+      ThresholdMetricId: ad1
+      TreatMissingData: breaching
+  TemperatureTimestreamDatabase:
+    Type: AWS::Timestream::Database
+    Properties: 
+      DatabaseName: TemperatureHistory
+  TemperatureTimestreamDatabaseTable:
+    Type: AWS::Timestream::Table
+    DependsOn: TemperatureTimestreamDatabase
+    Properties:
+        TableName: TemperatureHistory
+        DatabaseName: TemperatureHistory
+        RetentionProperties:
+            MemoryStoreRetentionPeriodInHours: "24"
+            MagneticStoreRetentionPeriodInDays: "7"
 
 Outputs:
   TemperatureApi:
     Description: "API Gateway endpoint URL for Prod stage for Temperature Writer function"
-    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/hello/"
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/"
   TemperatureWriterFunction:
     Description: "Temperature Writer Lambda Function ARN"
     Value: !GetAtt TemperatureWriterFunction.Arn
